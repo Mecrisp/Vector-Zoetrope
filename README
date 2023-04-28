@@ -1,0 +1,72 @@
+
+--------------------------------------------------------------------------------
+  Vector Zoetrope
+--------------------------------------------------------------------------------
+
+Zoetropes are an old, but charming way to display animations, invented long
+before film projection was invented. This project is a vector animation player
+which fits in 512 bytes on a GD32VF103 RISC-V microcontroller, using two DAC
+channels for vector graphics on an analog oscilloscope in XY mode connected to
+
+   GND and the two DAC channels on pins
+   PA4 (horizontal) and
+   PA5 (vertical).
+
+--------------------------------------------------------------------------------
+  Design ideas:
+--------------------------------------------------------------------------------
+
+Animation data that consists of the elements
+
+  moveto x y
+  lineto x y
+  end_of_frame
+  end_of_animation
+
+with x and y between 0 and 4095 for 12 bit DACs is displayed. Lines are rendered
+with the well known Bresenham algorithm, and the pixels are feed into a ring
+buffer that is processed by an interrupt handler for a constant pixel clock
+of 1.5 MHz in order to keep uniform brightness regardless of the calculation
+time necessary for an individual pixel.
+
+More sophisticated data representation for longer animations is coming soon!
+
+--------------------------------------------------------------------------------
+  How to run:
+--------------------------------------------------------------------------------
+
+If you have connected your
+
+Longan Nano board to
+             a USB-serial cable with 3.3V logic levels
+
+3V3 or 5V -- VCC (measure the voltage present here)
+R0        -- TXD
+T0        -- RXD
+GND       -- GND
+
+you can flash it if you first
+
+* Press and hold BOOT0 button
+* Press and release Reset button
+* Release BOOT0 button
+
+and then execute
+
+stm32loader -e -w -v -p /dev/ttyUSB0 vector-zoetrope.bin
+
+on your host machine.
+
+Press and release Reset button to start animation.
+
+--------------------------------------------------------------------------------
+  Credits:
+--------------------------------------------------------------------------------
+
+* Touhou "Bad Apple" video taken from Archive.org:
+
+https://ia802905.us.archive.org/19/items/TouhouBadApple/Touhou%20-%20Bad%20Apple.mp4
+
+* Vectorizer script by Bruno Levy:
+
+https://github.com/BrunoLevy/Vectorizer
