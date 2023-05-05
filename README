@@ -29,6 +29,11 @@ buffer that is processed by an interrupt handler for a constant pixel clock
 of 1.5 MHz in order to keep uniform brightness regardless of the calculation
 time necessary for an individual pixel.
 
+If coordinate delta is within (-64..63, -64..63), lineto elements are encoded
+in 16 bits of data, all other elements are encoded in 32 bits of data.
+
+The code assumes the CPU supports unaligned word fetches.
+
 More sophisticated data representation for longer animations is coming soon!
 
 --------------------------------------------------------------------------------

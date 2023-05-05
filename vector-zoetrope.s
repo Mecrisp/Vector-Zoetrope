@@ -128,6 +128,15 @@ timer_initialisation:
 # -----------------------------------------------------------------------------
 # Time to start drawing!
 
+  .macro unpackpixeldelta dac, x, y, oldx, oldy
+    slli \x, \dac, 32-7
+    srai \x, \x, 32-7
+    add  \x, \x, \oldx
+    slli \y, \dac, 32-7-8
+    srai \y, \y, 32-7
+    add  \y, \y, \oldy
+  .endm
+
   .macro unpackpixel dac, x, y
     slli \x, \dac, 32-12
     srli \x, \x, 32-12
@@ -180,6 +189,8 @@ start_animation:
 
 nextelement:
   lw x9, 0(x20) # Fetch next element to display
+  slli x15, x9, 16
+  bge x15, zero, pixellinetodelta
   addi x20, x20, 4
 
   li x15, -2    # End of animation marker reached?
@@ -215,6 +226,11 @@ pixelmoveto:
 
 pixellineto:
   unpackpixel x9, x12, x13   # Update destination coordinates and draw line
+  j bresenham
+
+pixellinetodelta:
+  addi x20, x20, 2
+  unpackpixeldelta x9, x12, x13, x10, x11
 
 # -----------------------------------------------------------------------------
 bresenham: # ( x10, x11 ) --> ( x12, x13 ) Inlined here for speed
@@ -350,12 +366,22 @@ pixeldone:                   # Looks good to keep the last drawn pixel instead!
 
 .p2align 9   # Align on 512 byte boundary
 
+  .set currentx, 0
+  .set currenty, 0
+
   .macro moveto x y
-    .hword \x, 0x8000 | \y
+    .hword 0x8000 | \x, 0x8000 | \y
   .endm
 
   .macro lineto x y
-    .hword \x, \y
+    .if (-64 <= (\x - currentx)) && ((\x - currentx) <= 63) && (-64 <= (\y - currenty)) && ((\y - currenty) <= 63)
+      .byte 0x7F & (\x - currentx), 0x7F & (\y - currenty)
+    .else
+      .hword 0x8000 | \x, \y
+    .endif
+
+    .set currentx, \x
+    .set currenty, \y
   .endm
 
   .macro end_of_frame
