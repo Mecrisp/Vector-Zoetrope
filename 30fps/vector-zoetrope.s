@@ -184,6 +184,8 @@ test: # Draw a diagonal line
 
 start_animation:
   la x20, data  # Pointer to current data source
+
+nextframe:
   mv x21, x20   # Update start of frame pointer
   li x29, 0     # Clear pixel counter
 
@@ -207,11 +209,6 @@ doneframe:
 
 repeatframe:
   mv x20, x21
-  j nextelement
-
-nextframe:
-  mv x21, x20   # Update start of frame pointer
-  li x29, 0     # Clear pixel counter
   j nextelement
 
 # -----------------------------------------------------------------------------
