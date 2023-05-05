@@ -1,0 +1,12 @@
+#!/bin/sh
+
+riscv64-linux-gnu-as vector-zoetrope.s -o vector-zoetrope.o -march=rv32im
+riscv64-linux-gnu-ld -o vector-zoetrope.elf -T memmap vector-zoetrope.o -m elf32lriscv
+riscv64-linux-gnu-objdump -Mnumeric -D vector-zoetrope.elf > vector-zoetrope.list
+riscv64-linux-gnu-objcopy vector-zoetrope.elf vector-zoetrope.bin -O binary
+
+rm -f vector-zoetrope.o
+rm -f vector-zoetrope.elf
+
+md5sum *.bin
+ls -l *.bin
