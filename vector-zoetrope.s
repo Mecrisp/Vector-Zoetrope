@@ -17,6 +17,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+# -----------------------------------------------------------------------------
 
 .option norelax
 .option rvc
@@ -25,6 +26,9 @@
 .equ RamEnd,    0x20008000  # End   of RAM, 32 kb.
 
 .equ RING_MASK, 0x000001FF  # Ring buffer size: 512 Bytes
+
+.equ pixelcycles, 12 # 108 MHz / 4 / pixelcycles --> 2.25 MHz pixel clock, 48 cycles per pixel
+.equ framepixels, 108000000 / 4 / pixelcycles / framerate # Pixels per frame to hold frame rate
 
 # -----------------------------------------------------------------------------
 #  Peripheral IO registers
@@ -47,11 +51,11 @@ Reset:
   li x14, RCU_BASE
   li x3,  DAC_BASE
 
-  li x8,  -1
-  sw x8,  RCU_APB1EN(x14) # Enable DAC and everything else
-  sw x8,  RCU_APB2EN(x14) # Enable power for something that is necessary for PLL and everything else
+  li x15,  -1
+  sw x15,  RCU_APB1EN(x14) # Enable DAC and everything else
+  sw x15,  RCU_APB2EN(x14) # Enable power for something that is necessary for PLL and everything else
 
-  li x15, 0x00010001      # Enable both DAC channels by setting DEN0 and DEN1
+  li x15, 0x00010001       # Enable both DAC channels by setting DEN0 and DEN1
   sw x15, DAC_CTL(x3)
 
 pll_initialisation:
@@ -69,23 +73,21 @@ pll_initialisation:
   sh x15, RCU_CTL+2(x14) # Halfword access because low part of register needs to be kept on reset values
 
 # -----------------------------------------------------------------------------
-# memory_initialisation:
-#
-#    li sp, RamEnd       # Initialise stack pointer
-#
-#    li x31, 0x20000000  # Start of RAM
-#    li x14, 0x20008000  # End of RAM
-#
-# 1: addi x14, x14, -4   # Traverse memory backwards
-#    sw zero, 0(x14)     # to clear it
-#    bne x14, x31, 1b
-#
+
+constant_initialisation:
+
+  la  x23, end_of_data # For detecting end of animation
+  li  x29, framepixels # Pixels to draw per frame
+  lui x30, 0xD1000     # Base for MTIMECMP
+  lui x31, 0xD2001     # VECTORCONFIG_BASE: Starting address of 87*4 ECLIC configuration registers
+
 # -----------------------------------------------------------------------------
 
 ring_buffer_initialisation:
 
-  li x4, 0
-  li x5, 0
+  li x4, RamStart
+  li x5, RamStart
+  li x6, RamStart | RING_MASK
 
 # -----------------------------------------------------------------------------
 
@@ -107,56 +109,69 @@ irq_initialisation:
 timer_initialisation:
 
   li  x14, 0x7F020100  # Enabled, rising edge, level 127
-  lui x15, 0xD2001     # VECTORCONFIG_BASE: Starting address of 87*4 ECLIC configuration registers
-  sw  x14, 7*4(x15)    # Vector 7: Timer
+  sw  x14, 7*4(x31)    # Vector 7: Timer
 
   li  x14, 1
-  lui x15, 0xD1001     # Timer mstop
-  sw  x14, -8 (x15)
+  lui x13, 0xD1001     # Timer mstop
+  sw  x14, -8 (x13)
 
-  lui x15, 0xD1000     # Clear mtime and mtimecmp
-  sw  zero, 0x0 (x15)
-  sw  zero, 0x4 (x15)
-  sw  zero, 0x8 (x15)
-  sw  zero, 0xC (x15)
+  li x24, 0            # Clear current time to use in interrupt handler
+  li x26, 0
 
-  lui x15, 0xD1001     # Release Timer mstop
-  sw  zero, -8 (x15)
+  sw  zero, 0x0 (x30)  # Clear mtime and mtimecmp
+  sw  zero, 0x4 (x30)
+  sw  zero, 0x8 (x30)
+  sw  zero, 0xC (x30)
+
+  sw  zero, -8 (x13)   # Release Timer mstop
 
   csrrsi zero, mstatus, 8 # Enable interrupts --> Interrupt will trigger immediately
 
 # -----------------------------------------------------------------------------
 # Time to start drawing!
 
-  .macro unpackpixeldelta dac, x, y, oldx, oldy
-    slli \x, \dac, 32-7
+  .macro unpackpixeldelta data, x, y, oldx, oldy
+    slli \x, \data, 32-7
     srai \x, \x, 32-7
     add  \x, \x, \oldx
-    slli \y, \dac, 32-7-8
+    slli \y, \data, 32-7-8
     srai \y, \y, 32-7
     add  \y, \y, \oldy
   .endm
 
-  .macro unpackpixel dac, x, y
-    slli \x, \dac, 32-12
+  .macro unpackpixel lowpart, highpart, x, y
+    slli \x, \lowpart, 32-12
     srli \x, \x, 32-12
-    slli \y, \dac, 32-12-16
+    slli \y, \highpart, 32-12
     srli \y, \y, 32-12
   .endm
 
-  .macro packpixel dac, x, y
-    slli \dac, \y, 16
-    or \dac, \dac, \x
+  .macro insert_ring  # Pixel coordinates in x10, x11
+    slli x9, x11, 16     # Combine x and y in the format
+    or   x9, x9, x10     # expected by the DAC register
+
+    addi x8, x4, 4
+    and  x8, x8, x6
+
+1:  beq x8, x5, 1b       # Wait until the interrupt handler consumed enough data for this to continue
+
+    sw  x9, 0(x4)        # Set pixel data
+    mv  x4, x8           # Update write index for interrupt handler to see
   .endm
 
 # -----------------------------------------------------------------------------
 #  Notes on register usage:
 #
-#   x3: Constant DAC_BASE
+#   x1: Unused
+#   x2: Unused
+#
+#   x3: Constant: DAC_BASE
 #   x4: Ring buffer write index
 #   x5: Ring buffer read  index
+#   x6: Ring buffer mask
 #
-#   x7: Scratch
+#   x7: Unused
+#
 #   x8: Scratch
 #   x9: Scratch
 #
@@ -168,65 +183,65 @@ timer_initialisation:
 #
 #  x20: Frame data pointer
 #  x21: Start of current frame pointer
+#  x22: Pixel counter for keeping the frame rate
+#  x23: Constant: End of animation data
 #
-#  x24-x28: Scratch for interrupt handler
-#  x29: Pixel counter for keeping the frame rate
+#  x24: Mirrored mtimecmp content, low part
+#  x25: Scratch for interrupt handler
+#  x26: Mirrored mtimecmp content, high part
+#
+#  x27: Unused
+#  x28: Unused
+#
+#  x29: Constant: Pixels to draw per frame
+#  x30: Constant: Base address for mtimecmp hardware registers
+#  x31: Constant: VECTORCONFIG_BASE: Starting address of 87*4 ECLIC configuration registers
 #
 # -----------------------------------------------------------------------------
-
-/*
-test: # Draw a diagonal line
-  mv x10, x29
-  mv x11, x29
-  call insert_ring
-  j test
-*/
 
 start_animation:
-  la x20, data  # Pointer to current data source
+  li x20, 512  # Pointer to current data source
 
 nextframe:
-  mv x21, x20   # Update start of frame pointer
-  li x29, 0     # Clear pixel counter
+  beq x20, x23, start_animation # Reached end of animation data?
+  mv x21, x20                   # Update start of frame pointer
+  mv x22, x29                   # Set pixels to draw per frame
 
 nextelement:
-  lw x9, 0(x20) # Fetch next element to display
-  slli x15, x9, 16
-  bge x15, zero, pixellinetodelta
+  lh x9, 0(x20) # Fetch next element to display, 16 bit format
+  bge x9, zero, shortencoding
+
+  lh x8, 2(x20) # Fetch next element to display, high part of 32 bit format
   addi x20, x20, 4
-
-  li x15, -2    # End of animation marker reached?
-  beq x15, x9, start_animation
-
-  li x15, -1    # End of frame marker
-  bne x15, x9, nextpixel
 
 # -----------------------------------------------------------------------------
 
-doneframe:
-  li x15, 300000            # Repeat until at least 300000 pixels have been drawn.
-  bgeu x29, x15, nextframe # Using a pixel clock of 1.5 MHz, this sets the frame rate to 5 Hz.
+nextpixel:
+  bge x8, zero, pixellineto  # Comment this out to display dots only
+
+pixelmoveto:
+  unpackpixel x9, x8, x10, x11   # Update current coordinates
+  insert_ring
+  j nextelement
+
+pixellineto:
+  unpackpixel x9, x8, x12, x13   # Update destination coordinates and draw line
+  j bresenham
+
+# -----------------------------------------------------------------------------
+
+shortencoding:
+  addi x20, x20, 2
+  bnez x9, pixellinetodelta # Check for end-of-frame marker 0
+
+doneframe:                  # Repeat until enough pixels have been drawn.
+  blt x22, zero, nextframe  # Using a known pixel clock, this sets the frame rate.
 
 repeatframe:
   mv x20, x21
   j nextelement
 
-# -----------------------------------------------------------------------------
-
-nextpixel:
-  bge x9, zero, pixellineto # Comment this out to display dots only
-
-pixelmoveto:
-  unpackpixel x9, x10, x11   # Update current coordinates
-  call insert_ring
-  j nextelement
-
-pixellineto:
-  unpackpixel x9, x12, x13   # Update destination coordinates and draw line
-  j bresenham
-
 pixellinetodelta:
-  addi x20, x20, 2
   unpackpixeldelta x9, x12, x13, x10, x11
 
 # -----------------------------------------------------------------------------
@@ -268,7 +283,7 @@ bresenham_loop:
     add x11, x11, x17
 1:
 
-  call insert_ring # Moved here in order not to draw the first point, as this one
+  insert_ring # Moved here in order not to draw the first point, as this one
   j bresenham_loop # is already drawn by "moveto" or the end of the line before.
 
 # -----------------------------------------------------------------------------
@@ -293,69 +308,40 @@ void line(int x0, int y0, int x1, int y1)
 */
 
 # -----------------------------------------------------------------------------
-insert_ring: # Pixel coordinates in x10, x11
-# -----------------------------------------------------------------------------
-
-  packpixel x7, x10, x11
-
-  addi x8, x4, 4
-  andi x8, x8, RING_MASK
-
-wait:
-  beq x8, x5, wait     # Wait until the interrupt handler consumed enough data for this to continue
-
-  li  x9, RamStart     # Pixel ring buffer at beginning of RAM
-  add x9, x9, x4       # Add write index
-  sw  x7, 0(x9)        # Set pixel data
-
-  mv x4, x8            # Update write index for interrupt handler to see
-
-  ret
 
 # -----------------------------------------------------------------------------
 .p2align 2 # Interrupt handler needs to be on a 4-even address
 interrupt:
 # -----------------------------------------------------------------------------
 
-  addi x29, x29, 1           # Count elapsed pixel times for this frame
+  addi x22, x22, -1          # Count elapsed pixel times for this frame
   beq x4, x5, nopixels       # Fresh pixels available in the ring buffer?
 
-    li  x25, RamStart          # Pixel ring buffer at beginning of RAM
-    add x25, x25, x5           # Add read index
-    lw  x25, 0(x25)            # Get pixel data
+    lw  x25, 0(x5)             # Get pixel data
     sw  x25, DACC_R12DH(x3)    # Set DACs
 
-    addi x5, x5, 4
-    andi x5, x5, RING_MASK
+    addi x5, x5, 4             # Update ring buffer read index
+    and  x5, x5, x6
 
-#   j pixeldone              # OK, data was available in time.
-nopixels:                    # This is mostly for checking execution speed.
-# sw  zero, DACC_R12DH(x3)   # Set DAC to lower left corner in empty frames.
-pixeldone:                   # Looks good to keep the last drawn pixel instead!
+nopixels:                   # Looks good to keep the last drawn pixel in empty frames
 
   # Prepare next interrupt by adjusting 64 bit value mtimecmp
 
-  lui x25, 0xD1000     # Fetch mtimecmp in x26:x24
-  lw  x24, 0x8 (x25)
-  lw  x26, 0xC (x25)
+  addi  x24, x24, pixelcycles   # How many cycles?  108 MHz / 4 / pixelcycles
+  sltiu x25, x24, pixelcycles   # Add to 64 bit value, with carry
+  add   x26, x26, x25
 
-# li x28, 54           # How many cycles?  108 MHz / 4 / 54 -->  500 kHz pixel clock
-# li x28, 27           # How many cycles?  108 MHz / 4 / 27 -->    1 MHz pixel clock
-  li x28, 18           # How many cycles?  108 MHz / 4 / 18 -->  1.5 MHz pixel clock
+  # Glitching is not a problem here as pending bit will be cleared directly after.
+  sw  x26, 0xC(x30)    # Set high part
+  sw  x24, 0x8(x30)    # Set low  part
 
-  add  x24, x24, x28   # Add to 64 bit value, with carry
-  sltu x27, x24, x28
-  add  x26, x26, x27
-
-  li  x27, -1          # See Volume II: RISC-V Privileged Architectures V1.10, 3.1.15: Machine Timer Registers
-  sw  x27, 0x8(x25)    # Set low  part to maximum to avoid glitching
-  sw  x26, 0xC(x25)    # Set high part
-  sw  x24, 0x8(x25)    # Set low  part
-
-  lui x25, 0xD2001     # VECTORCONFIG_BASE: Starting address of 87*4 ECLIC configuration registers
-  sb  zero, 7*4(x25)   # Clear pending for vector 7: Timer
+  sb  zero, 7*4(x31)   # Clear pending for vector 7: Timer
 
   mret
+
+# zerodac:                     # This is mostly for checking execution speed.
+#   sw  zero, DACC_R12DH(x3)   # Set DAC to lower left corner.
+#   j nopixels
 
 # -----------------------------------------------------------------------------
 # signature: .byte 'M', 'e', 'c', 'r', 'i', 's', 'p', '.'
@@ -371,10 +357,13 @@ pixeldone:                   # Looks good to keep the last drawn pixel instead!
   .endm
 
   .macro lineto x y
+
+    .if ((\x - currentx) != 0) || ((\y - currenty) != 0) # Do not encode a line if there is no movement
     .if (-64 <= (\x - currentx)) && ((\x - currentx) <= 63) && (-64 <= (\y - currenty)) && ((\y - currenty) <= 63)
       .byte 0x7F & (\x - currentx), 0x7F & (\y - currenty)
     .else
       .hword 0x8000 | \x, \y
+    .endif
     .endif
 
     .set currentx, \x
@@ -382,12 +371,13 @@ pixeldone:                   # Looks good to keep the last drawn pixel instead!
   .endm
 
   .macro end_of_frame
-    .hword 0xFFFF, 0xFFFF
+    .hword 0x0000
   .endm
 
   .macro end_of_animation
-    .hword 0xFFFE, 0xFFFF
+    # No marker necessary anymore
   .endm
 
-data:
+begin_of_data:
   .include "animation.s"
+end_of_data:

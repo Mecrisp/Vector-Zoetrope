@@ -7,11 +7,11 @@ Disassembly of section .text:
 00000000 <Reset>:
        0:	40021737          	lui	x14,0x40021
        4:	400071b7          	lui	x3,0x40007
-       8:	547d                	li	x8,-1
-       a:	cf40                	sw	x8,28(x14)
-       c:	cf00                	sw	x8,24(x14)
+       8:	57fd                	li	x15,-1
+       a:	cf5c                	sw	x15,28(x14)
+       c:	cf1c                	sw	x15,24(x14)
        e:	67c1                	lui	x15,0x10
-      10:	0785                	add	x15,x15,1 # 10001 <currentx+0xf710>
+      10:	0785                	add	x15,x15,1 # 10001 <currentx+0xf536>
       12:	40f1a023          	sw	x15,1024(x3) # 40007400 <DAC_BASE+0x400>
 
 00000016 <pll_initialisation>:
@@ -21,161 +21,159 @@ Disassembly of section .text:
       20:	10000793          	li	x15,256
       24:	00f71123          	sh	x15,2(x14) # 40021002 <RCU_BASE+0x2>
 
-00000028 <ring_buffer_initialisation>:
-      28:	4201                	li	x4,0
-      2a:	4281                	li	x5,0
+00000028 <constant_initialisation>:
+      28:	0001ab97          	auipc	x23,0x1a
+      2c:	b20b8b93          	add	x23,x23,-1248 # 19b48 <end_of_data>
+      30:	6ec9                	lui	x29,0x12
+      32:	4f8e8e93          	add	x29,x29,1272 # 124f8 <framepixels>
+      36:	d1000f37          	lui	x30,0xd1000
+      3a:	d2001fb7          	lui	x31,0xd2001
 
-0000002c <irq_initialisation>:
-      2c:	30047073          	csrc	mstatus,8
-      30:	478d                	li	x15,3
-      32:	30579073          	csrw	mtvec,x15
-      36:	00000797          	auipc	x15,0x0
-      3a:	12e78793          	add	x15,x15,302 # 164 <interrupt>
-      3e:	0017e793          	or	x15,x15,1
-      42:	7ec79073          	csrw	0x7ec,x15
+0000003e <ring_buffer_initialisation>:
+      3e:	20000237          	lui	x4,0x20000
+      42:	200002b7          	lui	x5,0x20000
+      46:	20000337          	lui	x6,0x20000
+      4a:	1ff30313          	add	x6,x6,511 # 200001ff <RamStart+0x1ff>
 
-00000046 <timer_initialisation>:
-      46:	7f020737          	lui	x14,0x7f020
-      4a:	10070713          	add	x14,x14,256 # 7f020100 <RCU_BASE+0x3efff100>
-      4e:	d20017b7          	lui	x15,0xd2001
-      52:	cfd8                	sw	x14,28(x15)
-      54:	4705                	li	x14,1
-      56:	d10017b7          	lui	x15,0xd1001
-      5a:	fee7ac23          	sw	x14,-8(x15) # d1000ff8 <RCU_BASE+0x90fdfff8>
-      5e:	d10007b7          	lui	x15,0xd1000
-      62:	0007a023          	sw	x0,0(x15) # d1000000 <RCU_BASE+0x90fdf000>
-      66:	0007a223          	sw	x0,4(x15)
-      6a:	0007a423          	sw	x0,8(x15)
-      6e:	0007a623          	sw	x0,12(x15)
-      72:	d10017b7          	lui	x15,0xd1001
-      76:	fe07ac23          	sw	x0,-8(x15) # d1000ff8 <RCU_BASE+0x90fdfff8>
-      7a:	30046073          	csrs	mstatus,8
+0000004e <irq_initialisation>:
+      4e:	30047073          	csrc	mstatus,8
+      52:	478d                	li	x15,3
+      54:	30579073          	csrw	mtvec,x15
+      58:	00000797          	auipc	x15,0x0
+      5c:	11478793          	add	x15,x15,276 # 16c <interrupt>
+      60:	0017e793          	or	x15,x15,1
+      64:	7ec79073          	csrw	0x7ec,x15
 
-0000007e <start_animation>:
-      7e:	00000a17          	auipc	x20,0x0
-      82:	182a0a13          	add	x20,x20,386 # 200 <data>
+00000068 <timer_initialisation>:
+      68:	7f020737          	lui	x14,0x7f020
+      6c:	10070713          	add	x14,x14,256 # 7f020100 <RCU_BASE+0x3efff100>
+      70:	00efae23          	sw	x14,28(x31) # d200101c <RCU_BASE+0x91fe001c>
+      74:	4705                	li	x14,1
+      76:	d10016b7          	lui	x13,0xd1001
+      7a:	fee6ac23          	sw	x14,-8(x13) # d1000ff8 <RCU_BASE+0x90fdfff8>
+      7e:	4c01                	li	x24,0
+      80:	4d01                	li	x26,0
+      82:	000f2023          	sw	x0,0(x30) # d1000000 <RCU_BASE+0x90fdf000>
+      86:	000f2223          	sw	x0,4(x30)
+      8a:	000f2423          	sw	x0,8(x30)
+      8e:	000f2623          	sw	x0,12(x30)
+      92:	fe06ac23          	sw	x0,-8(x13)
+      96:	30046073          	csrs	mstatus,8
 
-00000086 <nextframe>:
-      86:	8ad2                	mv	x21,x20
-      88:	4e81                	li	x29,0
+0000009a <start_animation>:
+      9a:	20000a13          	li	x20,512
 
-0000008a <nextelement>:
-      8a:	000a2483          	lw	x9,0(x20)
-      8e:	01049793          	sll	x15,x9,0x10
-      92:	0407d563          	bgez	x15,dc <pixellinetodelta>
-      96:	0a11                	add	x20,x20,4
-      98:	57f9                	li	x15,-2
-      9a:	fe9782e3          	beq	x15,x9,7e <start_animation>
-      9e:	57fd                	li	x15,-1
-      a0:	00979a63          	bne	x15,x9,b4 <nextpixel>
+0000009e <nextframe>:
+      9e:	ff7a0ee3          	beq	x20,x23,9a <start_animation>
+      a2:	8ad2                	mv	x21,x20
+      a4:	8b76                	mv	x22,x29
 
-000000a4 <doneframe>:
-      a4:	000497b7          	lui	x15,0x49
-      a8:	3e078793          	add	x15,x15,992 # 493e0 <currentx+0x48aef>
-      ac:	fcfefde3          	bgeu	x29,x15,86 <nextframe>
-
-000000b0 <repeatframe>:
-      b0:	8a56                	mv	x20,x21
-      b2:	bfe1                	j	8a <nextelement>
+000000a6 <nextelement>:
+      a6:	000a1483          	lh	x9,0(x20)
+      aa:	0404d163          	bgez	x9,ec <shortencoding>
+      ae:	002a1403          	lh	x8,2(x20)
+      b2:	0a11                	add	x20,x20,4
 
 000000b4 <nextpixel>:
-      b4:	0004dd63          	bgez	x9,ce <pixellineto>
+      b4:	02045563          	bgez	x8,de <pixellineto>
 
 000000b8 <pixelmoveto>:
       b8:	01449513          	sll	x10,x9,0x14
       bc:	8151                	srl	x10,x10,0x14
-      be:	00449593          	sll	x11,x9,0x4
+      be:	01441593          	sll	x11,x8,0x14
       c2:	81d1                	srl	x11,x11,0x14
-      c4:	00000097          	auipc	x1,0x0
-      c8:	07c080e7          	jalr	124(x1) # 140 <insert_ring>
-      cc:	bf7d                	j	8a <nextelement>
+      c4:	01059493          	sll	x9,x11,0x10
+      c8:	8cc9                	or	x9,x9,x10
+      ca:	00420413          	add	x8,x4,4 # 20000004 <RamStart+0x4>
+      ce:	00647433          	and	x8,x8,x6
+      d2:	00540063          	beq	x8,x5,d2 <pixelmoveto+0x1a>
+      d6:	00922023          	sw	x9,0(x4) # 0 <Reset>
+      da:	8222                	mv	x4,x8
+      dc:	b7e9                	j	a6 <nextelement>
 
-000000ce <pixellineto>:
-      ce:	01449613          	sll	x12,x9,0x14
-      d2:	8251                	srl	x12,x12,0x14
-      d4:	00449693          	sll	x13,x9,0x4
-      d8:	82d1                	srl	x13,x13,0x14
-      da:	a811                	j	ee <bresenham>
+000000de <pixellineto>:
+      de:	01449613          	sll	x12,x9,0x14
+      e2:	8251                	srl	x12,x12,0x14
+      e4:	01441693          	sll	x13,x8,0x14
+      e8:	82d1                	srl	x13,x13,0x14
+      ea:	a839                	j	108 <bresenham>
 
-000000dc <pixellinetodelta>:
-      dc:	0a09                	add	x20,x20,2
-      de:	01949613          	sll	x12,x9,0x19
-      e2:	8665                	sra	x12,x12,0x19
-      e4:	962a                	add	x12,x12,x10
-      e6:	01149693          	sll	x13,x9,0x11
-      ea:	86e5                	sra	x13,x13,0x19
-      ec:	96ae                	add	x13,x13,x11
+000000ec <shortencoding>:
+      ec:	0a09                	add	x20,x20,2
+      ee:	e489                	bnez	x9,f8 <pixellinetodelta>
 
-000000ee <bresenham>:
-      ee:	40a60733          	sub	x14,x12,x10
-      f2:	00075463          	bgez	x14,fa <bresenham+0xc>
-      f6:	40e00733          	neg	x14,x14
-      fa:	40b687b3          	sub	x15,x13,x11
-      fe:	0007c463          	bltz	x15,106 <bresenham+0x18>
-     102:	40f007b3          	neg	x15,x15
-     106:	00c52833          	slt	x16,x10,x12
-     10a:	9842                	add	x16,x16,x16
-     10c:	187d                	add	x16,x16,-1
-     10e:	00d5a8b3          	slt	x17,x11,x13
-     112:	98c6                	add	x17,x17,x17
-     114:	18fd                	add	x17,x17,-1
-     116:	00f70933          	add	x18,x14,x15
+000000f0 <doneframe>:
+      f0:	fa0b47e3          	bltz	x22,9e <nextframe>
 
-0000011a <bresenham_loop>:
-     11a:	00c51463          	bne	x10,x12,122 <bresenham_loop+0x8>
-     11e:	f6d586e3          	beq	x11,x13,8a <nextelement>
-     122:	012909b3          	add	x19,x18,x18
-     126:	0137d463          	bge	x15,x19,12e <bresenham_loop+0x14>
-     12a:	993e                	add	x18,x18,x15
-     12c:	9542                	add	x10,x10,x16
-     12e:	00e9d463          	bge	x19,x14,136 <bresenham_loop+0x1c>
-     132:	993a                	add	x18,x18,x14
-     134:	95c6                	add	x11,x11,x17
-     136:	00000097          	auipc	x1,0x0
-     13a:	00a080e7          	jalr	10(x1) # 140 <insert_ring>
-     13e:	bff1                	j	11a <bresenham_loop>
+000000f4 <repeatframe>:
+      f4:	8a56                	mv	x20,x21
+      f6:	bf45                	j	a6 <nextelement>
 
-00000140 <insert_ring>:
-     140:	01059393          	sll	x7,x11,0x10
-     144:	00a3e3b3          	or	x7,x7,x10
-     148:	00420413          	add	x8,x4,4 # 4 <RCU_CFG0>
-     14c:	1ff47413          	and	x8,x8,511
+000000f8 <pixellinetodelta>:
+      f8:	01949613          	sll	x12,x9,0x19
+      fc:	8665                	sra	x12,x12,0x19
+      fe:	962a                	add	x12,x12,x10
+     100:	01149693          	sll	x13,x9,0x11
+     104:	86e5                	sra	x13,x13,0x19
+     106:	96ae                	add	x13,x13,x11
 
-00000150 <wait>:
-     150:	00540063          	beq	x8,x5,150 <wait>
-     154:	200004b7          	lui	x9,0x20000
-     158:	9492                	add	x9,x9,x4
-     15a:	0074a023          	sw	x7,0(x9) # 20000000 <RamStart>
-     15e:	8222                	mv	x4,x8
-     160:	8082                	ret
-     162:	0001                	nop
+00000108 <bresenham>:
+     108:	40a60733          	sub	x14,x12,x10
+     10c:	00075463          	bgez	x14,114 <bresenham+0xc>
+     110:	40e00733          	neg	x14,x14
+     114:	40b687b3          	sub	x15,x13,x11
+     118:	0007c463          	bltz	x15,120 <bresenham+0x18>
+     11c:	40f007b3          	neg	x15,x15
+     120:	00c52833          	slt	x16,x10,x12
+     124:	9842                	add	x16,x16,x16
+     126:	187d                	add	x16,x16,-1
+     128:	00d5a8b3          	slt	x17,x11,x13
+     12c:	98c6                	add	x17,x17,x17
+     12e:	18fd                	add	x17,x17,-1
+     130:	00f70933          	add	x18,x14,x15
 
-00000164 <interrupt>:
-     164:	0e85                	add	x29,x29,1
-     166:	00520c63          	beq	x4,x5,17e <nopixels>
-     16a:	20000cb7          	lui	x25,0x20000
-     16e:	9c96                	add	x25,x25,x5
-     170:	000cac83          	lw	x25,0(x25) # 20000000 <RamStart>
-     174:	4391a023          	sw	x25,1056(x3)
-     178:	0291                	add	x5,x5,4
-     17a:	1ff2f293          	and	x5,x5,511
+00000134 <bresenham_loop>:
+     134:	00c51463          	bne	x10,x12,13c <bresenham_loop+0x8>
+     138:	f6d587e3          	beq	x11,x13,a6 <nextelement>
+     13c:	012909b3          	add	x19,x18,x18
+     140:	0137d463          	bge	x15,x19,148 <bresenham_loop+0x14>
+     144:	993e                	add	x18,x18,x15
+     146:	9542                	add	x10,x10,x16
+     148:	00e9d463          	bge	x19,x14,150 <bresenham_loop+0x1c>
+     14c:	993a                	add	x18,x18,x14
+     14e:	95c6                	add	x11,x11,x17
+     150:	01059493          	sll	x9,x11,0x10
+     154:	8cc9                	or	x9,x9,x10
+     156:	00420413          	add	x8,x4,4 # 4 <RCU_CFG0>
+     15a:	00647433          	and	x8,x8,x6
+     15e:	00540063          	beq	x8,x5,15e <bresenham_loop+0x2a>
+     162:	00922023          	sw	x9,0(x4) # 0 <Reset>
+     166:	8222                	mv	x4,x8
+     168:	b7f1                	j	134 <bresenham_loop>
+     16a:	0001                	nop
 
-0000017e <nopixels>:
-     17e:	d1000cb7          	lui	x25,0xd1000
-     182:	008cac03          	lw	x24,8(x25) # d1000008 <RCU_BASE+0x90fdf008>
-     186:	00ccad03          	lw	x26,12(x25)
-     18a:	4e49                	li	x28,18
-     18c:	9c72                	add	x24,x24,x28
-     18e:	01cc3db3          	sltu	x27,x24,x28
-     192:	9d6e                	add	x26,x26,x27
-     194:	5dfd                	li	x27,-1
-     196:	01bca423          	sw	x27,8(x25)
-     19a:	01aca623          	sw	x26,12(x25)
-     19e:	018ca423          	sw	x24,8(x25)
-     1a2:	d2001cb7          	lui	x25,0xd2001
-     1a6:	000c8e23          	sb	x0,28(x25) # d200101c <RCU_BASE+0x91fe001c>
-     1aa:	30200073          	mret
-     1ae:	0001                	nop
+0000016c <interrupt>:
+     16c:	1b7d                	add	x22,x22,-1
+     16e:	00520963          	beq	x4,x5,180 <nopixels>
+     172:	0002ac83          	lw	x25,0(x5) # 20000000 <RamStart>
+     176:	4391a023          	sw	x25,1056(x3)
+     17a:	0291                	add	x5,x5,4
+     17c:	0062f2b3          	and	x5,x5,x6
+
+00000180 <nopixels>:
+     180:	0c31                	add	x24,x24,12
+     182:	00cc3c93          	sltiu	x25,x24,12
+     186:	9d66                	add	x26,x26,x25
+     188:	01af2623          	sw	x26,12(x30)
+     18c:	018f2423          	sw	x24,8(x30)
+     190:	000f8e23          	sb	x0,28(x31)
+     194:	30200073          	mret
+     198:	00000013          	nop
+     19c:	00000013          	nop
+     1a0:	00000013          	nop
+     1a4:	00000013          	nop
+     1a8:	00000013          	nop
+     1ac:	00000013          	nop
      1b0:	00000013          	nop
      1b4:	00000013          	nop
      1b8:	00000013          	nop
@@ -204,7 +202,7 @@ Disassembly of section .riscv.attributes:
    2:	0000                	unimp
    4:	7200                	.2byte	0x7200
    6:	7369                	lui	x6,0xffffa
-   8:	01007663          	bgeu	x0,x16,14 <RCU_CFG0+0x10>
+   8:	01007663          	bgeu	x0,x16,14 <pixelcycles+0x8>
    c:	0026                	c.slli	x0,0x9
    e:	0000                	unimp
   10:	7205                	lui	x4,0xfffe1

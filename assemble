@@ -1,10 +1,22 @@
 #!/bin/sh
 
-riscv64-linux-gnu-as vector-zoetrope.s -o vector-zoetrope.o -march=rv32im
+cp animation-bad-apple-30fps.s animation.s
+riscv64-linux-gnu-as vector-zoetrope.s -o vector-zoetrope.o -march=rv32im --defsym framerate=30
 riscv64-linux-gnu-ld -o vector-zoetrope.elf -T memmap vector-zoetrope.o -m elf32lriscv
 riscv64-linux-gnu-objdump -Mnumeric -D vector-zoetrope.elf --stop-address=0x200 > vector-zoetrope.list
-riscv64-linux-gnu-objcopy vector-zoetrope.elf vector-zoetrope.bin -O binary
+riscv64-linux-gnu-objcopy vector-zoetrope.elf vector-zoetrope-bad-apple-30fps.bin -O binary
 
+cp animation-bad-apple-5fps.s animation.s
+riscv64-linux-gnu-as vector-zoetrope.s -o vector-zoetrope.o -march=rv32im --defsym framerate=5
+riscv64-linux-gnu-ld -o vector-zoetrope.elf -T memmap vector-zoetrope.o -m elf32lriscv
+riscv64-linux-gnu-objcopy vector-zoetrope.elf vector-zoetrope-bad-apple-5fps.bin -O binary
+
+cp animation-surprise-24fps.s animation.s
+riscv64-linux-gnu-as vector-zoetrope.s -o vector-zoetrope.o -march=rv32im --defsym framerate=24
+riscv64-linux-gnu-ld -o vector-zoetrope.elf -T memmap vector-zoetrope.o -m elf32lriscv
+riscv64-linux-gnu-objcopy vector-zoetrope.elf vector-zoetrope-surprise-24fps.bin -O binary
+
+rm -f animation.s
 rm -f vector-zoetrope.o
 rm -f vector-zoetrope.elf
 
