@@ -27,8 +27,7 @@
 
 .equ RING_MASK, 0x000001FF  # Ring buffer size: 512 Bytes
 
-.equ pixelcycles, 12 # 108 MHz / 4 / pixelcycles --> 2.25 MHz pixel clock, 48 cycles per pixel
-.equ framepixels, 108000000 / 4 / pixelcycles / framerate # Pixels per frame to hold frame rate
+.equ framecycles, 108000000 / framerate # Pixels per frame to hold frame rate
 
 # -----------------------------------------------------------------------------
 #  Peripheral IO registers
@@ -76,56 +75,8 @@ pll_initialisation:
 
 constant_initialisation:
 
-  la  x23, end_of_data # For detecting end of animation
-  li  x29, framepixels # Pixels to draw per frame
-  lui x30, 0xD1000     # Base for MTIMECMP
-  lui x31, 0xD2001     # VECTORCONFIG_BASE: Starting address of 87*4 ECLIC configuration registers
-
-# -----------------------------------------------------------------------------
-
-ring_buffer_initialisation:
-
-  li x4, RamStart
-  li x5, RamStart
-  li x6, RamStart | RING_MASK
-
-# -----------------------------------------------------------------------------
-
-irq_initialisation:
-
-  # Initialise special registers for interrupt handling
-
-  # Disable interrupts
-  csrrci zero, mstatus, 8    # MSTATUS: Clear Machine Interrupt Enable Bit
-
-  li x15, 3                  #        Set interrupt mode to ECLIC mode.
-  csrrw zero, 0x305, x15     # MTVEC: Store address of exception handler (none) and ECLIC mode in CSR mtvec.
-
-  # Non-vectored interrupt setting
-  la x15, interrupt          #         Make sure address is 4-aligned.
-  ori x15, x15, 1            #         Set LSB to 1: Indicates that this register (mtvt2)
-  csrrw zero, 0x7EC, x15     # MTVT2:  contains the address of non-vectored interrupts.
-
-timer_initialisation:
-
-  li  x14, 0x7F020100  # Enabled, rising edge, level 127
-  sw  x14, 7*4(x31)    # Vector 7: Timer
-
-  li  x14, 1
-  lui x13, 0xD1001     # Timer mstop
-  sw  x14, -8 (x13)
-
-  li x24, 0            # Clear current time to use in interrupt handler
-  li x26, 0
-
-  sw  zero, 0x0 (x30)  # Clear mtime and mtimecmp
-  sw  zero, 0x4 (x30)
-  sw  zero, 0x8 (x30)
-  sw  zero, 0xC (x30)
-
-  sw  zero, -8 (x13)   # Release Timer mstop
-
-  csrrsi zero, mstatus, 8 # Enable interrupts --> Interrupt will trigger immediately
+  la x23, end_of_data # For detecting end of animation
+  li x29, framecycles # Cycles for drawing pixels per frame
 
 # -----------------------------------------------------------------------------
 # Time to start drawing!
@@ -150,13 +101,7 @@ timer_initialisation:
     slli x9, x11, 16     # Combine x and y in the format
     or   x9, x9, x10     # expected by the DAC register
 
-    addi x8, x4, 4
-    and  x8, x8, x6
-
-1:  beq x8, x5, 1b       # Wait until the interrupt handler consumed enough data for this to continue
-
-    sw  x9, 0(x4)        # Set pixel data
-    mv  x4, x8           # Update write index for interrupt handler to see
+    sw x9, DACC_R12DH(x3)    # Set DACs
   .endm
 
 # -----------------------------------------------------------------------------
@@ -164,12 +109,10 @@ timer_initialisation:
 #
 #   x1: Unused
 #   x2: Unused
-#
 #   x3: Constant: DAC_BASE
-#   x4: Ring buffer write index
-#   x5: Ring buffer read  index
-#   x6: Ring buffer mask
-#
+#   x4: Unused
+#   x5: Unused
+#   x6: Unused
 #   x7: Unused
 #
 #   x8: Scratch
@@ -183,21 +126,21 @@ timer_initialisation:
 #
 #  x20: Frame data pointer
 #  x21: Start of current frame pointer
-#  x22: Pixel counter for keeping the frame rate
+#  x22: Cycles to reach before displaying next frame
 #  x23: Constant: End of animation data
 #
-#  x24: Mirrored mtimecmp content, low part
-#  x25: Scratch for interrupt handler
-#  x26: Mirrored mtimecmp content, high part
-#
+#  x24: Unused
+#  x25: Unused
+#  x26: Unused
 #  x27: Unused
 #  x28: Unused
-#
-#  x29: Constant: Pixels to draw per frame
-#  x30: Constant: Base address for mtimecmp hardware registers
-#  x31: Constant: VECTORCONFIG_BASE: Starting address of 87*4 ECLIC configuration registers
+#  x29: Constant: Cycles for drawing pixels per frame
+#  x30: Unused
+#  x31: Unused
 #
 # -----------------------------------------------------------------------------
+
+  rdcycle x22  # Get current time
 
 start_animation:
   li x20, 512  # Pointer to current data source
@@ -205,7 +148,7 @@ start_animation:
 nextframe:
   beq x20, x23, start_animation # Reached end of animation data?
   mv x21, x20                   # Update start of frame pointer
-  mv x22, x29                   # Set pixels to draw per frame
+  add x22, x22, x29             # Set cycles to spend drawing per frame
 
 nextelement:
   lh x9, 0(x20) # Fetch next element to display, 16 bit format
@@ -235,7 +178,9 @@ shortencoding:
   bnez x9, pixellinetodelta # Check for end-of-frame marker 0
 
 doneframe:                  # Repeat until enough pixels have been drawn.
-  blt x22, zero, nextframe  # Using a known pixel clock, this sets the frame rate.
+  rdcycle x28               # Get current time
+  sub x28, x28, x22         # Elapsed time, handles overflow gracefully
+  bge x28, zero, nextframe  # Using a known clock frequency, this sets the frame rate.
 
 repeatframe:
   mv x20, x21
@@ -306,42 +251,6 @@ void line(int x0, int y0, int x1, int y1)
 }
 
 */
-
-# -----------------------------------------------------------------------------
-
-# -----------------------------------------------------------------------------
-.p2align 2 # Interrupt handler needs to be on a 4-even address
-interrupt:
-# -----------------------------------------------------------------------------
-
-  addi x22, x22, -1          # Count elapsed pixel times for this frame
-  beq x4, x5, nopixels       # Fresh pixels available in the ring buffer?
-
-    lw  x25, 0(x5)             # Get pixel data
-    sw  x25, DACC_R12DH(x3)    # Set DACs
-
-    addi x5, x5, 4             # Update ring buffer read index
-    and  x5, x5, x6
-
-nopixels:                   # Looks good to keep the last drawn pixel in empty frames
-
-  # Prepare next interrupt by adjusting 64 bit value mtimecmp
-
-  addi  x24, x24, pixelcycles   # How many cycles?  108 MHz / 4 / pixelcycles
-  sltiu x25, x24, pixelcycles   # Add to 64 bit value, with carry
-  add   x26, x26, x25
-
-  # Glitching is not a problem here as pending bit will be cleared directly after.
-  sw  x26, 0xC(x30)    # Set high part
-  sw  x24, 0x8(x30)    # Set low  part
-
-  sb  zero, 7*4(x31)   # Clear pending for vector 7: Timer
-
-  mret
-
-# zerodac:                     # This is mostly for checking execution speed.
-#   sw  zero, DACC_R12DH(x3)   # Set DAC to lower left corner.
-#   j nopixels
 
 # -----------------------------------------------------------------------------
 # signature: .byte 'M', 'e', 'c', 'r', 'i', 's', 'p', '.'

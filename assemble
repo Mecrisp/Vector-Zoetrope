@@ -16,6 +16,11 @@ riscv64-linux-gnu-as vector-zoetrope.s -o vector-zoetrope.o -march=rv32im --defs
 riscv64-linux-gnu-ld -o vector-zoetrope.elf -T memmap vector-zoetrope.o -m elf32lriscv
 riscv64-linux-gnu-objcopy vector-zoetrope.elf vector-zoetrope-surprise-24fps.bin -O binary
 
+cp animation-timing-test.s animation.s
+riscv64-linux-gnu-as vector-zoetrope.s -o vector-zoetrope.o -march=rv32im --defsym framerate=30
+riscv64-linux-gnu-ld -o vector-zoetrope.elf -T memmap vector-zoetrope.o -m elf32lriscv
+riscv64-linux-gnu-objcopy vector-zoetrope.elf vector-zoetrope-timing-test-30fps.bin -O binary
+
 rm -f animation.s
 rm -f vector-zoetrope.o
 rm -f vector-zoetrope.elf
